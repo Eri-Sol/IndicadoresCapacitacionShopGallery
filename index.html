@@ -390,12 +390,17 @@ document.getElementById('file-input').addEventListener('change', function(e) {
       if (newData.length === 0) { status.style.color = '#e05a00'; status.textContent = '❌ No se encontraron datos válidos. Verificá el formato.'; return; }
       allData = newData;
       filtered = [...allData];
+      // Destruir todos los gráficos antes de recrear
+      Object.keys(charts).forEach(id => { if (charts[id]) { charts[id].destroy(); delete charts[id]; } });
+      // Limpiar y repoblar filtros
       ['f-mes','f-area','f-modalidad','f-instructor','f-tipo'].forEach(id => {
         const sel = document.getElementById(id);
         while (sel.options.length > 1) sel.remove(1);
+        sel.value = '';
       });
       populateFilters();
-      resetFilters();
+      // Forzar render completo con datos nuevos
+      renderAll();
       const now = new Date().toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
       status.style.color = '#27ae60';
       status.textContent = `✅ ${newData.length} registros cargados · ${now}`;
