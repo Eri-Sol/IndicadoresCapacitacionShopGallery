@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard de Capacitación 2026</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f4f8; color: #2c3e50; }
+
+.header {
+  background: linear-gradient(135deg, #2c5f8a 0%, #4a90c4 100%);
+  padding: 18px 28px; display: flex; align-items: center; justify-content: space-between;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+}
+.header h1 { color: #fff; font-size: 20px; font-weight: 700; letter-spacing: .5px; }
+.header .subtitle { color: #b8d9f0; font-size: 12px; margin-top: 3px; }
+.header-right { color: #fff; font-size: 12px; text-align: right; opacity: .8; }
+
+.import-bar {
+  background: #f5f9fc; padding: 8px 24px;
+  display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  border-bottom: 1px solid #dde4ec; font-size: 12px;
+}
+.import-bar span { color: #7a8fa8; font-weight: 600; }
+.btn-import {
+  padding: 6px 14px; background: #4a90c4; color: #fff; border: none;
+  border-radius: 5px; font-size: 11px; cursor: pointer; font-weight: 600;
+}
+.btn-import:hover { background: #2c5f8a; }
+#import-status { color: #27ae60; font-size: 11px; font-weight: 600; }
+
+.filter-bar {
+  background: #fff; padding: 12px 24px;
+  display: flex; gap: 14px; flex-wrap: wrap; align-items: center;
+  border-bottom: 1px solid #dde4ec; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.filter-bar label { font-size: 11px; color: #7a8fa8; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; }
+.filter-bar select {
+  padding: 6px 10px; border: 1.5px solid #c8d8e8; border-radius: 6px;
+  font-size: 12px; color: #2c3e50; background: #f8fbfd; cursor: pointer;
+  outline: none; min-width: 120px;
+}
+.filter-bar select:focus { border-color: #4a90c4; }
+.fg { display: flex; flex-direction: column; gap: 4px; }
+.btn-reset {
+  padding: 7px 16px; background: #e8f0f8; border: 1.5px solid #b8d0e8;
+  border-radius: 6px; font-size: 12px; color: #2c5f8a; cursor: pointer;
+  font-weight: 600; align-self: flex-end;
+}
+.btn-reset:hover { background: #2c5f8a; color: #fff; }
+.record-badge {
+  font-size: 11px; color: #8fa5bc; background: #f0f4f8;
+  padding: 3px 10px; border-radius: 10px; margin-left: auto;
+}
+
+.kpis { display: flex; gap: 14px; padding: 18px 24px 10px; flex-wrap: wrap; }
+.kpi-card {
+  flex: 1; min-width: 130px; background: #fff; border-radius: 10px;
+  padding: 16px 18px; box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+  border-left: 4px solid transparent; display: flex; flex-direction: column;
+  gap: 6px; transition: transform .15s;
+}
+.kpi-card:hover { transform: translateY(-2px); }
+.kpi-card.blue   { border-color: #7bafd8; background: linear-gradient(135deg,#fff 60%,#e8f4fd); }
+.kpi-card.green  { border-color: #7dc4a0; background: linear-gradient(135deg,#fff 60%,#e6f5ee); }
+.kpi-card.orange { border-color: #f5b97c; background: linear-gradient(135deg,#fff 60%,#fef4e6); }
+.kpi-card.purple { border-color: #b09ad8; background: linear-gradient(135deg,#fff 60%,#f0ebf8); }
+.kpi-card.pink   { border-color: #e89eae; background: linear-gradient(135deg,#fff 60%,#fceef1); }
+.kpi-label { font-size: 10px; color: #8fa5bc; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; }
+.kpi-value { font-size: 28px; font-weight: 700; color: #2c3e50; line-height: 1; }
+.kpi-sub   { font-size: 11px; color: #a0b4c8; }
+
+.grid {
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  gap: 14px; padding: 10px 24px 24px;
+}
+.card {
+  background: #fff; border-radius: 10px;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+  padding: 18px; display: flex; flex-direction: column; gap: 12px;
+}
+.card.wide { grid-column: span 2; }
+.card.full { grid-column: span 3; }
+.card h3 {
+  font-size: 12px; font-weight: 700; color: #5a7a9a;
+  text-transform: uppercase; letter-spacing: .5px;
+  padding-bottom: 8px; border-bottom: 1px solid #eef2f6;
+}
+.chart-wrap { position: relative; flex: 1; min-height: 180px; }
+canvas { max-width: 100%; }
+
+.table-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 11px; }
+th {
+  background: #e8f0f8; color: #5a7a9a; font-weight: 700;
+  padding: 8px 10px; text-align: left; position: sticky; top: 0;
+  text-transform: uppercase; letter-spacing: .3px; font-size: 10px;
+  border-bottom: 2px solid #c8d8e8;
+}
+td { padding: 7px 10px; border-bottom: 1px solid #f0f4f8; }
+tr:nth-child(even) td { background: #f8fbfd; }
+tr:hover td { background: #eef5fc; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; }
+.badge.presencial { background: #d4edff; color: #1a6fa5; }
+.badge.virtual    { background: #e8d5ff; color: #6a3fa5; }
+.badge.interno    { background: #d4f5e9; color: #1a7a55; }
+.badge.externo    { background: #ffe8d4; color: #a5501a; }
+
+.insights { display: flex; gap: 12px; flex-wrap: wrap; }
+.insight-card { flex: 1; min-width: 180px; border-radius: 8px; padding: 12px 14px; border-left: 3px solid; }
+.insight-card h4 { font-size: 11px; font-weight: 700; margin-bottom: 4px; }
+.insight-card p  { font-size: 11px; color: #5a6a78; line-height: 1.5; }
+.ins-blue   { background: #e8f4fd; border-color: #7bafd8; } .ins-blue h4 { color: #1e5f8e; }
+.ins-green  { background: #e6f5ee; border-color: #7dc4a0; } .ins-green h4 { color: #1a6b4a; }
+.ins-orange { background: #fef4e6; border-color: #f5b97c; } .ins-orange h4 { color: #a56020; }
+.ins-purple { background: #f0ebf8; border-color: #b09ad8; } .ins-purple h4 { color: #5b3a8a; }
+
+.donut-row { display: flex; gap: 10px; }
+.donut-row > div { flex: 1; }
+.legend { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #5a6a78; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+.table-toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.search-input {
+  flex: 1; max-width: 360px; padding: 7px 12px;
+  border: 1.5px solid #c8d8e8; border-radius: 6px;
+  font-size: 12px; color: #2c3e50; outline: none;
+}
+.btn-export {
+  padding: 7px 14px; background: #2c5f8a; color: #fff;
+  border: none; border-radius: 6px; font-size: 12px;
+  cursor: pointer; font-weight: 600;
+}
+.btn-export:hover { background: #1a3f6a; }
+
+@media(max-width:900px){
+  .grid { grid-template-columns: 1fr 1fr; }
+  .card.wide { grid-column: span 2; }
+  .card.full { grid-column: span 2; }
+}
+@media(max-width:600px){
+  .grid { grid-template-columns: 1fr; padding: 8px 12px; }
+  .card.wide, .card.full { grid-column: span 1; }
+  .kpis { padding: 12px; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>📊 Dashboard de Capacitación</h1>
+    <div class="subtitle">Análisis interactivo · 2026</div>
+  </div>
+  <div class="header-right">
+    <div id="kpi-header">273 registros cargados</div>
+    <div id="period-header">Feb — Jul 2026</div>
+  </div>
+</div>
+
+<div class="import-bar">
+  <span>📂 Actualizar datos:</span>
+  <button class="btn-import" onclick="document.getElementById('file-input').click()">⬆️ Subir Excel / CSV</button>
+  <input type="file" id="file-input" accept=".csv" style="display:none">
+  <span id="import-status"></span>
+  <span style="margin-left:auto;color:#aab;font-size:11px;">💡 Exportá tu Excel como CSV y subilo para actualizar el dashboard</span>
+</div>
+
+<div class="filter-bar">
+  <div class="fg"><label>Mes</label>
+    <select id="f-mes" onchange="applyFilters()"><option value="">Todos</option></select></div>
+  <div class="fg"><label>Área</label>
+    <select id="f-area" onchange="applyFilters()"><option value="">Todas</option></select></div>
+  <div class="fg"><label>Modalidad</label>
+    <select id="f-modalidad" onchange="applyFilters()"><option value="">Todas</option></select></div>
+  <div class="fg"><label>Instructor</label>
+    <select id="f-instructor" onchange="applyFilters()"><option value="">Todos</option></select></div>
+  <div class="fg"><label>Tipo</label>
+    <select id="f-tipo" onchange="applyFilters()"><option value="">Todos</option></select></div>
+  <div class="fg"><label>Puesto</label>
+    <select id="f-puesto" onchange="applyFilters()"><option value="">Todos</option></select></div>
+  <button class="btn-reset" onclick="resetFilters()">↺ Limpiar</button>
+  <span class="record-badge" id="filtered-count">273 registros</span>
+</div>
+
+<div class="kpis">
+  <div class="kpi-card blue">
+    <div class="kpi-label">Total Registros</div>
+    <div class="kpi-value" id="k-total">—</div>
+    <div class="kpi-sub">participaciones</div>
+  </div>
+  <div class="kpi-card green">
+    <div class="kpi-label">Empleados Únicos</div>
+    <div class="kpi-value" id="k-emp">—</div>
+    <div class="kpi-sub">personas capacitadas</div>
+  </div>
+  <div class="kpi-card orange">
+    <div class="kpi-label">Total Horas</div>
+    <div class="kpi-value" id="k-horas">—</div>
+    <div class="kpi-sub">horas de formación</div>
+  </div>
+  <div class="kpi-card purple">
+    <div class="kpi-label">Acciones</div>
+    <div class="kpi-value" id="k-acciones">—</div>
+    <div class="kpi-sub">cursos distintos</div>
+  </div>
+  <div class="kpi-card pink">
+    <div class="kpi-label">Prom. Hrs/Empleado</div>
+    <div class="kpi-value" id="k-prom">—</div>
+    <div class="kpi-sub">horas promedio</div>
+  </div>
+</div>
+
+<div class="grid">
+
+  <div class="card wide">
+    <h3>📈 Evolución Mensual — Horas & Participaciones</h3>
+    <div class="chart-wrap" style="height:220px"><canvas id="ch-mensual"></canvas></div>
+  </div>
+
+  <div class="card">
+    <h3>🔵 Modalidad & Instructor</h3>
+    <div class="donut-row">
+      <div>
+        <div style="height:120px;position:relative"><canvas id="ch-modalidad"></canvas></div>
+        <div class="legend" id="leg-modalidad"></div>
+      </div>
+      <div>
+        <div style="height:120px;position:relative"><canvas id="ch-instructor"></canvas></div>
+        <div class="legend" id="leg-instructor"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card wide">
+    <h3>🏢 Participaciones por Área</h3>
+    <div class="chart-wrap" style="height:220px"><canvas id="ch-area"></canvas></div>
+  </div>
+
+  <div class="card">
+    <h3>🎓 Tipo de Capacitación</h3>
+    <div style="height:160px;position:relative"><canvas id="ch-tipo"></canvas></div>
+    <div class="legend" id="leg-tipo"></div>
+  </div>
+
+  <div class="card wide">
+    <h3>🎯 Top Acciones de Capacitación</h3>
+    <div class="chart-wrap" style="height:220px"><canvas id="ch-acciones"></canvas></div>
+  </div>
+
+  <div class="card">
+    <h3>⏱️ Horas por Área</h3>
+    <div class="chart-wrap" style="height:200px"><canvas id="ch-horas-area"></canvas></div>
+  </div>
+
+  <div class="card full">
+    <h3>🏅 Top 10 Colaboradores — Horas de Capacitación</h3>
+    <div class="chart-wrap" style="height:260px"><canvas id="ch-ranking"></canvas></div>
+  </div>
+
+  <div class="card full">
+    <h3>💡 Insights Clave</h3>
+    <div class="insights" id="insights-container"></div>
+  </div>
+
+  <div class="card full">
+    <h3>📋 Detalle de Registros <span id="table-count" style="font-weight:400;color:#aab;font-size:11px"></span></h3>
+    <div class="table-toolbar">
+      <input type="text" class="search-input" id="table-search"
+        placeholder="🔍 Buscar por nombre o legajo..." oninput="renderTable()">
+      <button class="btn-export" onclick="exportToExcel()">📥 Exportar a Excel</button>
+    </div>
+    <div class="table-scroll" style="max-height:300px;overflow-y:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>Legajo</th><th>Nombre</th><th>Área</th><th>Puesto</th>
+            <th>Acción</th><th>Tipo</th><th>Mes</th><th>Horas</th>
+            <th>Modalidad</th><th>Instructor</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────────
+var RAW_DATA = [{"Legajo": "1014", "Apellido y Nombre": "Maximiliano Pfluger", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado", "Tipo": "Capacitación Continua", "Acción": "COTY", "Mes": "Marzo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1005", "Apellido y Nombre": "Alicia Arismendi", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "COTY", "Mes": "Marzo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "835", "Apellido y Nombre": "Fernanda Peraita", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "COTY", "Mes": "Marzo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "330", "Apellido y Nombre": "Silvia Solís", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "COTY", "Mes": "Marzo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "744", "Apellido y Nombre": "Ana Elgani", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "COTY", "Mes": "Marzo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1120", "Apellido y Nombre": "Daniela Franco", "Centro de Costo": "Customer Experiencie", "Puesto": "Responsable Cx", "Tipo": "Capacitación Continua", "Acción": "COTY", "Mes": "Marzo", "Año": "2026", "Horas": 1.5, "Área": "Customer Experience", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "555", "Apellido y Nombre": "Carla Sanchez", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado", "Tipo": "Capacitación Continua", "Acción": "COTY", "Mes": "Marzo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "209", "Apellido y Nombre": "Silvina Spada", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "COTY", "Mes": "Marzo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "164", "Apellido y Nombre": "Gabriela Padin", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "COTY", "Mes": "Marzo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1161", "Apellido y Nombre": "Martina Sureda", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "COTY", "Mes": "Marzo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "902", "Apellido y Nombre": "Lucía Marzilli", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "COTY", "Mes": "Marzo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "88", "Apellido y Nombre": "Leandro Leonetti", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado", "Tipo": "Capacitación Continua", "Acción": "ASOBU", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1049", "Apellido y Nombre": "Ivan Blanco", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "ASOBU", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "849", "Apellido y Nombre": "Ezequiel Luna", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "ASOBU", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1171", "Apellido y Nombre": "Miguel Rodriguez", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "ASOBU", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "336", "Apellido y Nombre": "Verónica Vechiarelli", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "ASOBU", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1120", "Apellido y Nombre": "Daniela Franco", "Centro de Costo": "Customer Experiencie", "Puesto": "Responsable Cx", "Tipo": "Capacitación Continua", "Acción": "ASOBU", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Customer Experience", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "555", "Apellido y Nombre": "Carla Sanchez", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado", "Tipo": "Capacitación Continua", "Acción": "ASOBU", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "832", "Apellido y Nombre": "Walter Villanueva", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "ASOBU", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1151", "Apellido y Nombre": "Lucas Carballo", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "ASOBU", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "742", "Apellido y Nombre": "Rosana Bertolini", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "ASOBU", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "218", "Apellido y Nombre": "Gabriel Riadigos", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "ASOBU", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "780", "Apellido y Nombre": "Alejandro Moran", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LAGARDE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "618", "Apellido y Nombre": "Lautaro Mansilla", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LAGARDE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1185", "Apellido y Nombre": "Azul Suarez", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LAGARDE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1049", "Apellido y Nombre": "Ivan Blanco", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LAGARDE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1202", "Apellido y Nombre": "Kiara Beer", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LAGARDE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "555", "Apellido y Nombre": "Carla Sanchez", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado", "Tipo": "Capacitación Continua", "Acción": "LAGARDE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "218", "Apellido y Nombre": "Gabriel Riadigos", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LAGARDE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "832", "Apellido y Nombre": "Walter Villanueva", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LAGARDE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "618", "Apellido y Nombre": "Lautaro Mansilla", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LAGARDE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "335", "Apellido y Nombre": "Gabriela Souto", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LAGARDE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1014", "Apellido y Nombre": "Maximiliano Pfluger", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado", "Tipo": "Capacitación Continua", "Acción": "CASA PIRQUE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "780", "Apellido y Nombre": "Alejandro Moran", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CASA PIRQUE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1171", "Apellido y Nombre": "Miguel Rodriguez", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CASA PIRQUE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "917", "Apellido y Nombre": "Javier Dominguez", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CASA PIRQUE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1153", "Apellido y Nombre": "Fernando Croxatto", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CASA PIRQUE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "555", "Apellido y Nombre": "Carla Sanchez", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado", "Tipo": "Capacitación Continua", "Acción": "CASA PIRQUE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "218", "Apellido y Nombre": "Gabriel Riadigos", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CASA PIRQUE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "849", "Apellido y Nombre": "Ezequiel Luna", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CASA PIRQUE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "820", "Apellido y Nombre": "Johanna Galiano", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CASA PIRQUE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1151", "Apellido y Nombre": "Lucas Carballo", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CASA PIRQUE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "88", "Apellido y Nombre": "Leandro Leonetti", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado", "Tipo": "Capacitación Continua", "Acción": "GIN BOSQUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "780", "Apellido y Nombre": "Alejandro Moran", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "GIN BOSQUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1185", "Apellido y Nombre": "Azul Suarez", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "GIN BOSQUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "980", "Apellido y Nombre": "Carolina Lezcano", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "GIN BOSQUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "981", "Apellido y Nombre": "Noelia Perez", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "GIN BOSQUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "555", "Apellido y Nombre": "Carla Sanchez", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado", "Tipo": "Capacitación Continua", "Acción": "GIN BOSQUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "832", "Apellido y Nombre": "Walter Villanueva", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "GIN BOSQUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "265", "Apellido y Nombre": "Daniel Marín", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "GIN BOSQUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1153", "Apellido y Nombre": "Fernando Croxatto", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "GIN BOSQUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1049", "Apellido y Nombre": "Ivan Blanco", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "GIN BOSQUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1005", "Apellido y Nombre": "Alicia Arismendi", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CAVIAHUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "835", "Apellido y Nombre": "Fernanda Peraita", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CAVIAHUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "902", "Apellido y Nombre": "Lucía Marzilli", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CAVIAHUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "330", "Apellido y Nombre": "Silvia Solís", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CAVIAHUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1312", "Apellido y Nombre": "Emilia Quinto", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CAVIAHUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "555", "Apellido y Nombre": "Carla Sanchez", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado", "Tipo": "Capacitación Continua", "Acción": "CAVIAHUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "209", "Apellido y Nombre": "Silvina Spada", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CAVIAHUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "164", "Apellido y Nombre": "Gabriela Padin", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CAVIAHUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1161", "Apellido y Nombre": "Martina Sureda", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CAVIAHUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1222", "Apellido y Nombre": "Roselena Toussaint", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CAVIAHUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "606", "Apellido y Nombre": "Paola Escalante", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "COTY", "Mes": "Marzo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "647", "Apellido y Nombre": "Belen Avalos", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "COTY", "Mes": "Marzo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1184", "Apellido y Nombre": "Lucila Gordillo", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "COTY", "Mes": "Marzo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1007", "Apellido y Nombre": "Agustina Vommaro", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "COTY", "Mes": "Marzo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "208", "Apellido y Nombre": "Melisa Maccarrone", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado", "Tipo": "Capacitación Continua", "Acción": "COTY", "Mes": "Marzo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "607", "Apellido y Nombre": "Candela Trujillo", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "COTY", "Mes": "Marzo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1142", "Apellido y Nombre": "Valeria Straniero", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "COTY", "Mes": "Marzo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "875", "Apellido y Nombre": "Julieta Curti", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "COTY", "Mes": "Marzo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "525", "Apellido y Nombre": "Nadia Ortiz", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "COTY", "Mes": "Marzo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "961", "Apellido y Nombre": "Anabella Villamil", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado", "Tipo": "Capacitación Continua", "Acción": "COTY", "Mes": "Marzo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "763", "Apellido y Nombre": "Ivone De Carlo", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "ASOBU", "Mes": "Marzo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1302", "Apellido y Nombre": "Emilia Andres", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "ASOBU", "Mes": "Marzo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1296", "Apellido y Nombre": "Lucas Berasategui", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "ASOBU", "Mes": "Marzo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1219", "Apellido y Nombre": "Noelia De Mattei", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "ASOBU", "Mes": "Marzo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "816", "Apellido y Nombre": "Jose Silveira", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "ASOBU", "Mes": "Marzo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "957", "Apellido y Nombre": "Claudio Stefano", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado", "Tipo": "Capacitación Continua", "Acción": "ASOBU", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "781", "Apellido y Nombre": "Paula Soria", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "ASOBU", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "986", "Apellido y Nombre": "Eugenia Rost", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "ASOBU", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1290", "Apellido y Nombre": "Dalila Meza", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "ASOBU", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "987", "Apellido y Nombre": "Lorena Gonzalez", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "ASOBU", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "525", "Apellido y Nombre": "Nadia Ortiz", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "ASOBU", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "961", "Apellido y Nombre": "Anabella Villamil", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado", "Tipo": "Capacitación Continua", "Acción": "ASOBU", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "255", "Apellido y Nombre": "Alberto Boffa", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LAGARDE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "978", "Apellido y Nombre": "Victor Schabas", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LAGARDE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1216", "Apellido y Nombre": "Matias Santini", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LAGARDE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "741", "Apellido y Nombre": "Lucila Libardi", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LAGARDE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "659", "Apellido y Nombre": "Sebastian O'Keeffe", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LAGARDE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "957", "Apellido y Nombre": "Claudio Stefano", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado", "Tipo": "Capacitación Continua", "Acción": "LAGARDE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "781", "Apellido y Nombre": "Paula Soria", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LAGARDE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "986", "Apellido y Nombre": "Eugenia Rost", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LAGARDE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "771", "Apellido y Nombre": "Horacio Borini", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LAGARDE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "963", "Apellido y Nombre": "Rodrigo Posse", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LAGARDE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "208", "Apellido y Nombre": "Melisa Maccarrone", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado", "Tipo": "Capacitación Continua", "Acción": "LAGARDE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "255", "Apellido y Nombre": "Alberto Boffa", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CASA PIRQUE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "978", "Apellido y Nombre": "Victor Schabas", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CASA PIRQUE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "816", "Apellido y Nombre": "Jose Silveira", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CASA PIRQUE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "920", "Apellido y Nombre": "Cristian Sejas", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CASA PIRQUE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "957", "Apellido y Nombre": "Claudio Stefano", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado", "Tipo": "Capacitación Continua", "Acción": "CASA PIRQUE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "781", "Apellido y Nombre": "Paula Soria", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CASA PIRQUE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1296", "Apellido y Nombre": "Lucas Berasategui", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CASA PIRQUE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "771", "Apellido y Nombre": "Horacio Borini", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CASA PIRQUE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "659", "Apellido y Nombre": "Sebastian O'Keeffe", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CASA PIRQUE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "208", "Apellido y Nombre": "Melisa Maccarrone", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado", "Tipo": "Capacitación Continua", "Acción": "CASA PIRQUE", "Mes": "Abril", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "255", "Apellido y Nombre": "Alberto Boffa", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "GIN BOSQUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "978", "Apellido y Nombre": "Victor Schabas", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "GIN BOSQUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1216", "Apellido y Nombre": "Matias Santini", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "GIN BOSQUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "957", "Apellido y Nombre": "Claudio Stefano", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado", "Tipo": "Capacitación Continua", "Acción": "GIN BOSQUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "986", "Apellido y Nombre": "Eugenia Rost", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "GIN BOSQUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "781", "Apellido y Nombre": "Paula Soria", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "GIN BOSQUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "963", "Apellido y Nombre": "Rodrigo Posse", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "GIN BOSQUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "961", "Apellido y Nombre": "Anabella Villamil", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado", "Tipo": "Capacitación Continua", "Acción": "GIN BOSQUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "606", "Apellido y Nombre": "Paola Escalante", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CAVIAHUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "647", "Apellido y Nombre": "Belen Avalos", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CAVIAHUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "130", "Apellido y Nombre": "Veronica Correa", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CAVIAHUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "875", "Apellido y Nombre": "Julieta Curti", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CAVIAHUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1219", "Apellido y Nombre": "Noelia De Mattei", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CAVIAHUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "208", "Apellido y Nombre": "Melisa Maccarrone", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado", "Tipo": "Capacitación Continua", "Acción": "CAVIAHUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "815", "Apellido y Nombre": "Pamela Oviedo", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CAVIAHUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1142", "Apellido y Nombre": "Valeria Straniero", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CAVIAHUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "403", "Apellido y Nombre": "Romina Rodriguez", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CAVIAHUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1160", "Apellido y Nombre": "Solange Lencina", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "CAVIAHUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "961", "Apellido y Nombre": "Anabella Villamil", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado", "Tipo": "Capacitación Continua", "Acción": "CAVIAHUE", "Mes": "Mayo", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1109", "Apellido y Nombre": "Maratea, Lucas", "Centro de Costo": "COMERCIAL", "Puesto": "Coordinador Comercial", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Abril", "Año": "2026", "Horas": 2.0, "Área": "Comercial", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "784", "Apellido y Nombre": "Galarza Saiach, Mariela Del Rosario", "Centro de Costo": "ADMINISTRACION Y F", "Puesto": "Coordinadora de Impuestos", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 3.0, "Área": "Administración", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "338", "Apellido y Nombre": "Bustamante, Jose Luis", "Centro de Costo": "ABASTECIMIENTOS", "Puesto": "Encargado de Abastecimiento", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 2.0, "Área": "Abastecimiento", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "369", "Apellido y Nombre": "Rotchen, Eduardo Javier", "Centro de Costo": "ABASTECIMIENTOS", "Puesto": "Encargado de Abastecimiento", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 2.0, "Área": "Abastecimiento", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "667", "Apellido y Nombre": "Aguad, Eduardo Ismael", "Centro de Costo": "ABASTECIMIENTOS", "Puesto": "Encargado de Abastecimiento", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 2.0, "Área": "Abastecimiento", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "88", "Apellido y Nombre": "Leonetti, Leandro Ariel", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado de Ventas", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 2.0, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "208", "Apellido y Nombre": "Maccarrone, Melisa", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado de Ventas", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 2.0, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "301", "Apellido y Nombre": "Kasza, Mariana Elizabet", "Centro de Costo": "VENTAS MENDOZA", "Puesto": "Encargado de Ventas", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 2.0, "Área": "Ventas", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "555", "Apellido y Nombre": "Sanchez, Carla Patricia", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado de Ventas", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 2.0, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "583", "Apellido y Nombre": "Terribile, Silvina", "Centro de Costo": "VENTAS CORDOBA", "Puesto": "Encargado de Ventas", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 2.0, "Área": "Ventas", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "957", "Apellido y Nombre": "Stefano, Claudio Adrian", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado de Ventas", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 2.0, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "961", "Apellido y Nombre": "Villamil, Anabella Melina", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado de Ventas", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 2.0, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1014", "Apellido y Nombre": "Pfluger, Maximiliano Daniel", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado de Ventas", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 2.0, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1056", "Apellido y Nombre": "Amado, Javier Federico", "Centro de Costo": "VENTAS CORDOBA", "Puesto": "Encargado de Ventas", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 2.0, "Área": "Ventas", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1084", "Apellido y Nombre": "Keegan, Marina", "Centro de Costo": "VENTAS IGUAZU", "Puesto": "Encargado de Ventas", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 2.0, "Área": "Ventas", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1091", "Apellido y Nombre": "Libutzki, Analia Evelin", "Centro de Costo": "VENTAS IGUAZU", "Puesto": "Encargado de Ventas", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 2.0, "Área": "Ventas", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1093", "Apellido y Nombre": "Argañaraz, Mayra Anttonella", "Centro de Costo": "VENTAS TUCUMAN", "Puesto": "Encargado de Ventas", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 2.0, "Área": "Ventas", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1125", "Apellido y Nombre": "Hurtado, Maximiliano", "Centro de Costo": "VENTAS BARILOCHE A", "Puesto": "Encargado de Ventas", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 2.0, "Área": "Ventas", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1167", "Apellido y Nombre": "Delonc Linares, Agustin", "Centro de Costo": "VENTAS SALTA", "Puesto": "Encargado de Ventas", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 2.0, "Área": "Ventas", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "956", "Apellido y Nombre": "Fioravanti, Joaquin", "Centro de Costo": "COMERCIAL", "Puesto": "Gerente Comercial", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 3.0, "Área": "Comercial", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1294", "Apellido y Nombre": "Urcola, Cintia Noelia", "Centro de Costo": "WEB", "Puesto": "Gerente de E-commerce", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 3.0, "Área": "E-Commerce", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1314", "Apellido y Nombre": "Lopez Ferrofino, Emanuel David", "Centro de Costo": "ABASTECIMIENTOS", "Puesto": "Gerente de Logística", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 3.0, "Área": "Abastecimiento", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1230", "Apellido y Nombre": "Toso, Fabian Franco", "Centro de Costo": "SISTEMAS", "Puesto": "Gerente de Sistemas", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 3.0, "Área": "Sistemas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1251", "Apellido y Nombre": "Servia, Sergio Ezequiel", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Gerente de Ventas", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 3.0, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1203", "Apellido y Nombre": "Rudi, Lucas Matias Sebastian", "Centro de Costo": "GERENCIA GENERAL", "Puesto": "Gerente General", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 3.0, "Área": "Gerencia", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1252", "Apellido y Nombre": "Finkelstein, Damian Esteban", "Centro de Costo": "ADMINISTRACION Y F", "Puesto": "Gte de Adm. y Finanzas", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 3.0, "Área": "Administración", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1247", "Apellido y Nombre": "Liguori, Mariana Alejandra", "Centro de Costo": "ADMINISTRACION Y F", "Puesto": "Jefa Administración", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 3.0, "Área": "Administración", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1288", "Apellido y Nombre": "Sosa, Julieta", "Centro de Costo": "RECURSOS HUMANOS", "Puesto": "Jefa de Rrhh", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 3.0, "Área": "RRHH", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1250", "Apellido y Nombre": "Rigo Linares, Diego", "Centro de Costo": "ADMINISTRACION Y F", "Puesto": "Jefe de Finanzas", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 3.0, "Área": "Administración", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "738", "Apellido y Nombre": "Romero, Noelia Elizabeth", "Centro de Costo": "MARKETING E IMAGEN", "Puesto": "Jefe de Imagen", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 3.0, "Área": "Marketing", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "262", "Apellido y Nombre": "Algañaras, Guillermo Sebastian", "Centro de Costo": "ABASTECIMIENTOS", "Puesto": "Jefe de Logística In Bound", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 3.0, "Área": "Abastecimiento", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "251", "Apellido y Nombre": "Gonzalez, Sergio Ernesto", "Centro de Costo": "Mantenimiento e In", "Puesto": "Jefe de Mantenimiento", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 3.0, "Área": "Mantenimiento", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "826", "Apellido y Nombre": "Biscia, Victor Guillermo", "Centro de Costo": "SISTEMAS", "Puesto": "Jefe de Sistemas", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 3.0, "Área": "Sistemas", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "608", "Apellido y Nombre": "Catini, Patricia Maribel", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Jefe de Ventas", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 3.0, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1260", "Apellido y Nombre": "Garcia Ramirez, Jose Miguel", "Centro de Costo": "COMERCIAL", "Puesto": "Project Manager", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 3.0, "Área": "Comercial", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "304", "Apellido y Nombre": "Diez, Analia", "Centro de Costo": "COMERCIAL", "Puesto": "Responsable de Categoria", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 3.0, "Área": "Comercial", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "991", "Apellido y Nombre": "Lopez, Daniela Paola", "Centro de Costo": "COMERCIAL", "Puesto": "Responsable de Categoria", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 3.0, "Área": "Comercial", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1135", "Apellido y Nombre": "Jersonsky, Luciana", "Centro de Costo": "COMERCIAL", "Puesto": "Responsable de Categoria", "Tipo": "Capacitación Continua", "Acción": "Programa de Liderazgo", "Mes": "Mayo", "Año": "2026", "Horas": 3.0, "Área": "Comercial", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1109", "Apellido y Nombre": "Maratea, Lucas", "Centro de Costo": "COMERCIAL", "Puesto": "Coordinador Comercial", "Tipo": "Capacitación Continua", "Acción": "Taller de Redacción Objevios SMART", "Mes": "Abril", "Año": "2026", "Horas": 1.0, "Área": "Comercial", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "784", "Apellido y Nombre": "Galarza Saiach, Mariela Del Rosario", "Centro de Costo": "ADMINISTRACION Y F", "Puesto": "Coordinadora de Impuestos", "Tipo": "Capacitación Continua", "Acción": "Taller de Redacción Objevios SMART", "Mes": "Abril", "Año": "2026", "Horas": 1.0, "Área": "Administración", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1247", "Apellido y Nombre": "Liguori, Mariana Alejandra", "Centro de Costo": "ADMINISTRACION Y F", "Puesto": "Jefa Administración", "Tipo": "Capacitación Continua", "Acción": "Taller de Redacción Objevios SMART", "Mes": "Abril", "Año": "2026", "Horas": 1.0, "Área": "Administración", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1288", "Apellido y Nombre": "Sosa, Julieta", "Centro de Costo": "RECURSOS HUMANOS", "Puesto": "Jefa de Rrhh", "Tipo": "Capacitación Continua", "Acción": "Taller de Redacción Objevios SMART", "Mes": "Abril", "Año": "2026", "Horas": 1.0, "Área": "RRHH", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1250", "Apellido y Nombre": "Rigo Linares, Diego", "Centro de Costo": "ADMINISTRACION Y F", "Puesto": "Jefe de Finanzas", "Tipo": "Capacitación Continua", "Acción": "Taller de Redacción Objevios SMART", "Mes": "Abril", "Año": "2026", "Horas": 1.0, "Área": "Administración", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "738", "Apellido y Nombre": "Romero, Noelia Elizabeth", "Centro de Costo": "MARKETING E IMAGEN", "Puesto": "Jefe de Imagen", "Tipo": "Capacitación Continua", "Acción": "Taller de Redacción Objevios SMART", "Mes": "Abril", "Año": "2026", "Horas": 1.0, "Área": "Marketing", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "262", "Apellido y Nombre": "Algañaras, Guillermo Sebastian", "Centro de Costo": "ABASTECIMIENTOS", "Puesto": "Jefe de Logística In Bound", "Tipo": "Capacitación Continua", "Acción": "Taller de Redacción Objevios SMART", "Mes": "Abril", "Año": "2026", "Horas": 1.0, "Área": "Abastecimiento", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "251", "Apellido y Nombre": "Gonzalez, Sergio Ernesto", "Centro de Costo": "Mantenimiento e In", "Puesto": "Jefe de Mantenimiento", "Tipo": "Capacitación Continua", "Acción": "Taller de Redacción Objevios SMART", "Mes": "Abril", "Año": "2026", "Horas": 1.0, "Área": "Mantenimiento", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "826", "Apellido y Nombre": "Biscia, Victor Guillermo", "Centro de Costo": "SISTEMAS", "Puesto": "Jefe de Sistemas", "Tipo": "Capacitación Continua", "Acción": "Taller de Redacción Objevios SMART", "Mes": "Abril", "Año": "2026", "Horas": 1.0, "Área": "Sistemas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "608", "Apellido y Nombre": "Catini, Patricia Maribel", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Jefe de Ventas", "Tipo": "Capacitación Continua", "Acción": "Taller de Redacción Objevios SMART", "Mes": "Abril", "Año": "2026", "Horas": 1.0, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1260", "Apellido y Nombre": "Garcia Ramirez, Jose Miguel", "Centro de Costo": "COMERCIAL", "Puesto": "Project Manager", "Tipo": "Capacitación Continua", "Acción": "Taller de Redacción Objevios SMART", "Mes": "Abril", "Año": "2026", "Horas": 1.0, "Área": "Comercial", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "304", "Apellido y Nombre": "Diez, Analia", "Centro de Costo": "COMERCIAL", "Puesto": "Responsable de Categoria", "Tipo": "Capacitación Continua", "Acción": "Taller de Redacción Objevios SMART", "Mes": "Abril", "Año": "2026", "Horas": 1.0, "Área": "Comercial", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "991", "Apellido y Nombre": "Lopez, Daniela Paola", "Centro de Costo": "COMERCIAL", "Puesto": "Responsable de Categoria", "Tipo": "Capacitación Continua", "Acción": "Taller de Redacción Objevios SMART", "Mes": "Abril", "Año": "2026", "Horas": 1.0, "Área": "Comercial", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1135", "Apellido y Nombre": "Jersonsky, Luciana", "Centro de Costo": "COMERCIAL", "Puesto": "Responsable de Categoria", "Tipo": "Capacitación Continua", "Acción": "Taller de Redacción Objevios SMART", "Mes": "Abril", "Año": "2026", "Horas": 1.0, "Área": "Comercial", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1299", "Apellido y Nombre": "Vera, Lorenzo", "Centro de Costo": "SISTEMAS", "Puesto": "Analista Sistemas Jr", "Tipo": "Onboarding", "Acción": "Inducción RRHH", "Mes": "Febrero", "Año": "2026", "Horas": 1.0, "Área": "Sistemas", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1299", "Apellido y Nombre": "Vera, Lorenzo", "Centro de Costo": "SISTEMAS", "Puesto": "Analista Sistemas Jr", "Tipo": "Capacitación Continua", "Acción": "Curso Gestión del Tiempo", "Mes": "Febrero", "Año": "2026", "Horas": 2.0, "Área": "Sistemas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1299", "Apellido y Nombre": "Vera, Lorenzo", "Centro de Costo": "SISTEMAS", "Puesto": "Analista Sistemas Jr", "Tipo": "Capacitación Continua", "Acción": "Curso Comunicación Efectiva", "Mes": "Febrero", "Año": "2026", "Horas": 3.0, "Área": "Sistemas", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1305", "Apellido y Nombre": "Guillen, Milagros", "Centro de Costo": "COMERCIAL", "Puesto": "Analista Comercial", "Tipo": "Onboarding", "Acción": "Inducción RRHH", "Mes": "Marzo", "Año": "2026", "Horas": 1.0, "Área": "Comercial", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1305", "Apellido y Nombre": "Guillen, Milagros", "Centro de Costo": "COMERCIAL", "Puesto": "Analista Comercial", "Tipo": "Capacitación Continua", "Acción": "Curso Gestión del Tiempo", "Mes": "Marzo", "Año": "2026", "Horas": 2.0, "Área": "Comercial", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1305", "Apellido y Nombre": "Guillen, Milagros", "Centro de Costo": "COMERCIAL", "Puesto": "Analista Comercial", "Tipo": "Capacitación Continua", "Acción": "Curso Comunicación Efectiva", "Mes": "Marzo", "Año": "2026", "Horas": 3.0, "Área": "Comercial", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1306", "Apellido y Nombre": "Bueses, Alejandra", "Centro de Costo": "WEB", "Puesto": "Analista Sr. Marketing Digital", "Tipo": "Onboarding", "Acción": "Inducción RRHH", "Mes": "Marzo", "Año": "2026", "Horas": 1.0, "Área": "E-Commerce", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1306", "Apellido y Nombre": "Bueses, Alejandra", "Centro de Costo": "WEB", "Puesto": "Analista Sr. Marketing Digital", "Tipo": "Capacitación Continua", "Acción": "Curso Gestión del Tiempo", "Mes": "Marzo", "Año": "2026", "Horas": 2.0, "Área": "E-Commerce", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1306", "Apellido y Nombre": "Bueses, Alejandra", "Centro de Costo": "WEB", "Puesto": "Analista Sr. Marketing Digital", "Tipo": "Capacitación Continua", "Acción": "Curso Comunicación Efectiva", "Mes": "Marzo", "Año": "2026", "Horas": 3.0, "Área": "E-Commerce", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1310", "Apellido y Nombre": "Azoulay, Gimena", "Centro de Costo": "COMERCIAL", "Puesto": "Analista Comercial", "Tipo": "Onboarding", "Acción": "Inducción RRHH", "Mes": "Marzo", "Año": "2026", "Horas": 1.0, "Área": "Comercial", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1310", "Apellido y Nombre": "Azoulay, Gimena", "Centro de Costo": "COMERCIAL", "Puesto": "Analista Comercial", "Tipo": "Capacitación Continua", "Acción": "Curso Gestión del Tiempo", "Mes": "Marzo", "Año": "2026", "Horas": 2.0, "Área": "Comercial", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1310", "Apellido y Nombre": "Azoulay, Gimena", "Centro de Costo": "COMERCIAL", "Puesto": "Analista Comercial", "Tipo": "Capacitación Continua", "Acción": "Curso Comunicación Efectiva", "Mes": "Marzo", "Año": "2026", "Horas": 3.0, "Área": "Comercial", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1311", "Apellido y Nombre": "Forlani, Mateo", "Centro de Costo": "COMERCIAL", "Puesto": "Analista Comercial", "Tipo": "Onboarding", "Acción": "Inducción RRHH", "Mes": "Marzo", "Año": "2026", "Horas": 1.0, "Área": "Comercial", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1311", "Apellido y Nombre": "Forlani, Mateo", "Centro de Costo": "COMERCIAL", "Puesto": "Analista Comercial", "Tipo": "Capacitación Continua", "Acción": "Curso Comunicación Efectiva", "Mes": "Marzo", "Año": "2026", "Horas": 3.0, "Área": "Comercial", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1311", "Apellido y Nombre": "Forlani, Mateo", "Centro de Costo": "COMERCIAL", "Puesto": "Analista Comercial", "Tipo": "Capacitación Continua", "Acción": "Curso Gestión del Tiempo", "Mes": "Marzo", "Año": "2026", "Horas": 2.0, "Área": "Comercial", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1315", "Apellido y Nombre": "Misiano, Mauro", "Centro de Costo": "COMERCIAL", "Puesto": "Analista de Data Sciense", "Tipo": "Onboarding", "Acción": "Inducción RRHH", "Mes": "Mayo", "Año": "2026", "Horas": 1.0, "Área": "Comercial", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1315", "Apellido y Nombre": "Misiano, Mauro", "Centro de Costo": "COMERCIAL", "Puesto": "Analista de Data Sciense", "Tipo": "Capacitación Continua", "Acción": "Curso Comunicación Efectiva", "Mes": "Mayo", "Año": "2026", "Horas": 3.0, "Área": "Comercial", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1315", "Apellido y Nombre": "Misiano, Mauro", "Centro de Costo": "COMERCIAL", "Puesto": "Analista de Data Sciense", "Tipo": "Capacitación Continua", "Acción": "Curso Gestión del Tiempo", "Mes": "Mayo", "Año": "2026", "Horas": 2.0, "Área": "Comercial", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1316", "Apellido y Nombre": "Manzo, Lorenzo", "Centro de Costo": "COMERCIAL", "Puesto": "Analista Sistemas Jr", "Tipo": "Onboarding", "Acción": "Inducción RRHH", "Mes": "Mayo", "Año": "2026", "Horas": 1.0, "Área": "Sistemas", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1316", "Apellido y Nombre": "Manzo, Lorenzo", "Centro de Costo": "COMERCIAL", "Puesto": "Analista Sistemas Jr", "Tipo": "Capacitación Continua", "Acción": "Curso Comunicación Efectiva", "Mes": "Mayo", "Año": "2026", "Horas": 3.0, "Área": "Sistemas", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1316", "Apellido y Nombre": "Manzo, Lorenzo", "Centro de Costo": "COMERCIAL", "Puesto": "Analista Sistemas Jr", "Tipo": "Capacitación Continua", "Acción": "Curso Gestión del Tiempo", "Mes": "Mayo", "Año": "2026", "Horas": 2.0, "Área": "Sistemas", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1317", "Apellido y Nombre": "Mastrostefano, Delfina", "Centro de Costo": "COMERCIAL", "Puesto": "Analista Comercial", "Tipo": "Onboarding", "Acción": "Inducción RRHH", "Mes": "Julio", "Año": "2026", "Horas": 1.0, "Área": "Comercial", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Interno"}, {"Legajo": "1317", "Apellido y Nombre": "Mastrostefano, Delfina", "Centro de Costo": "COMERCIAL", "Puesto": "Analista Comercial", "Tipo": "Capacitación Continua", "Acción": "Curso Comunicación Efectiva", "Mes": "Julio", "Año": "2026", "Horas": 3.0, "Área": "Comercial", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1317", "Apellido y Nombre": "Mastrostefano, Delfina", "Centro de Costo": "COMERCIAL", "Puesto": "Analista Comercial", "Tipo": "Capacitación Continua", "Acción": "Curso Gestión del Tiempo", "Mes": "Julio", "Año": "2026", "Horas": 2.0, "Área": "Comercial", "Modalidad": "Virtual", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1014", "Apellido y Nombre": "Maximiliano Pfluger", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado", "Tipo": "Capacitación Continua", "Acción": "LOEWE", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1005", "Apellido y Nombre": "Alicia Arismendi", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LOEWE", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "265", "Apellido y Nombre": "Daniel Marin", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LOEWE", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1312", "Apellido y Nombre": "Emilia Quinto", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LOEWE", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "539", "Apellido y Nombre": "Andrea Sabadin", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LOEWE", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1120", "Apellido y Nombre": "Daniela Franco", "Centro de Costo": "Customer Experiencie", "Puesto": "Responsable Cx", "Tipo": "Capacitación Continua", "Acción": "LOEWE", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1143", "Apellido y Nombre": "Santiago Barbeira", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado", "Tipo": "Capacitación Continua", "Acción": "LOEWE", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "164", "Apellido y Nombre": "Gabriela Padin", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LOEWE", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "209", "Apellido y Nombre": "Silvina Spada", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LOEWE", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1161", "Apellido y Nombre": "Martina Sureda", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LOEWE", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "330", "Apellido y Nombre": "Silvia Solis", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LOEWE", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "657", "Apellido y Nombre": "Amelia Atea", "Centro de Costo": "Customer Experiencie", "Puesto": "Responsable Cx", "Tipo": "Capacitación Continua", "Acción": "LOEWE", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "849", "Apellido y Nombre": "Ezequiel Luna", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado", "Tipo": "Capacitación Continua", "Acción": "BELKIN", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1049", "Apellido y Nombre": "Iván Blanco", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "BELKIN", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1171", "Apellido y Nombre": "Miguel Rodriguez", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "BELKIN", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "336", "Apellido y Nombre": "Verónica Vechiarelli", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "BELKIN", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1151", "Apellido y Nombre": "Lucas Carballo", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "BELKIN", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1231", "Apellido y Nombre": "Melina Lopez", "Centro de Costo": "Comercial", "Puesto": "Category Manager", "Tipo": "Capacitación Continua", "Acción": "BELKIN", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Comercial", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1281", "Apellido y Nombre": "Solana Pistolesi", "Centro de Costo": "Comercial", "Puesto": "Analista de Ordenes", "Tipo": "Capacitación Continua", "Acción": "BELKIN", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Comercial", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "555", "Apellido y Nombre": "Carla Sanchez", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado", "Tipo": "Capacitación Continua", "Acción": "BELKIN", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "832", "Apellido y Nombre": "Walter Villanueva", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "BELKIN", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "218", "Apellido y Nombre": "Gabriel Riadigos", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "BELKIN", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "172", "Apellido y Nombre": "Javier Argiz", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "BELKIN", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1143", "Apellido y Nombre": "Santiago Barbeira", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "BELKIN", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "849", "Apellido y Nombre": "Ezequiel Luna", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado", "Tipo": "Capacitación Continua", "Acción": "MARS", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1005", "Apellido y Nombre": "Alicia Arismendi", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "MARS", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "902", "Apellido y Nombre": "Lucía Marzilli", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "MARS", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1120", "Apellido y Nombre": "Daniela Franco", "Centro de Costo": "Customer Experiencie", "Puesto": "Responsable Cx", "Tipo": "Capacitación Continua", "Acción": "MARS", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "618", "Apellido y Nombre": "Lautaro Mansilla", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "MARS", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1185", "Apellido y Nombre": "Azul Suarez", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "MARS", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1143", "Apellido y Nombre": "Santiago Barbeira", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "MARS", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "742", "Apellido y Nombre": "Rosana Bertolini", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "MARS", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "820", "Apellido y Nombre": "Johanna Galiano", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "MARS", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "744", "Apellido y Nombre": "Ana Elgani", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "MARS", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1222", "Apellido y Nombre": "Roselena Toussaint", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "MARS", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "657", "Apellido y Nombre": "Amelia Atea", "Centro de Costo": "CX Aeroparque", "Puesto": "Responsable Cx", "Tipo": "Capacitación Continua", "Acción": "MARS", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1222", "Apellido y Nombre": "Roselena Toussaint", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "ADIDAS", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "539", "Apellido y Nombre": "Andrea Sabaddin", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "ADIDAS", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "618", "Apellido y Nombre": "Lautaro Mansilla", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "ADIDAS", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1153", "Apellido y Nombre": "Fernando Croxatto", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "ADIDAS", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1143", "Apellido y Nombre": "Santiago Barbeira", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "ADIDAS", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "336", "Apellido y Nombre": "Verónica Vechiarelli", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "ADIDAS", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1202", "Apellido y Nombre": "Kiara Beer", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "ADIDAS", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "208", "Apellido y Nombre": "Melisa Maccarrone", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargada", "Tipo": "Capacitación Continua", "Acción": "LOEWE", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "606", "Apellido y Nombre": "Paola Escalante", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LOEWE", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "647", "Apellido y Nombre": "Belen Avalos", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LOEWE", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1184", "Apellido y Nombre": "Lucila Gordillo", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LOEWE", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "130", "Apellido y Nombre": "Veronica Correa", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LOEWE", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "608", "Apellido y Nombre": "Maribel Catini", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Jefa de Ventas", "Tipo": "Capacitación Continua", "Acción": "LOEWE", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "781", "Apellido y Nombre": "Paula Soria", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LOEWE", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "403", "Apellido y Nombre": "Romina Rodriguez", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LOEWE", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "607", "Apellido y Nombre": "Candela Trujillo", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LOEWE", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "815", "Apellido y Nombre": "Pamela Oviedo", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LOEWE", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1142", "Apellido y Nombre": "Valeria Straniero", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "LOEWE", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1120", "Apellido y Nombre": "Daniela Franco", "Centro de Costo": "Customer Experiencie", "Puesto": "Responsable Cx", "Tipo": "Capacitación Continua", "Acción": "BELKIN", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1296", "Apellido y Nombre": "Lucas Berasategui", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "BELKIN", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "920", "Apellido y Nombre": "Cristian Sejas", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "BELKIN", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "978", "Apellido y Nombre": "Victor Schabas", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "BELKIN", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1302", "Apellido y Nombre": "Emilia Andres", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "BELKIN", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "957", "Apellido y Nombre": "Claudio Stefano", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargado", "Tipo": "Capacitación Continua", "Acción": "BELKIN", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "657", "Apellido y Nombre": "Amelia Atea", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Responsable Cx", "Tipo": "Capacitación Continua", "Acción": "BELKIN", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1160", "Apellido y Nombre": "Solange Lencina", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "BELKIN", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1270", "Apellido y Nombre": "Carolina Rodriguez", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "BELKIN", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1290", "Apellido y Nombre": "Dalila Meza", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "BELKIN", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "963", "Apellido y Nombre": "Rodrigo Posse", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "BELKIN", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "961", "Apellido y Nombre": "Anabella Villamil", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Encargada", "Tipo": "Capacitación Continua", "Acción": "BELKIN", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "608", "Apellido y Nombre": "Maribel Catini", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Jefa de Ventas", "Tipo": "Capacitación Continua", "Acción": "BELKIN", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "657", "Apellido y Nombre": "Amelia Atea", "Centro de Costo": "CX Aeroparque", "Puesto": "Responsable Cx", "Tipo": "Capacitación Continua", "Acción": "BELKIN", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1302", "Apellido y Nombre": "Emilia Andres", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "MARS", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1007", "Apellido y Nombre": "Agustina Vommaro", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "MARS", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1219", "Apellido y Nombre": "Noelia De Mattei", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "MARS", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "1216", "Apellido y Nombre": "Matias Santini", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "MARS", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}, {"Legajo": "781", "Apellido y Nombre": "Paula Soria", "Centro de Costo": "Ventas Aeroparque", "Puesto": "Cajero-vendedor", "Tipo": "Capacitación Continua", "Acción": "MARS", "Mes": "Junio", "Año": "2026", "Horas": 1.5, "Área": "Ventas", "Modalidad": "Presencial", "Estado": "Finalizada", "Instructor": "Externo"}];
+
+// ── STATE ─────────────────────────────────────────────────────────
+var allData = RAW_DATA.slice();
+var filtered = allData.slice();
+var charts = {};
+var MES_ORDER = ['Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+var PASTEL = ['#B8D4E8','#B8E0C8','#FFD6A5','#D4B8E0','#F4C2C2','#A8D8D8','#FFF0A0','#FFBBA8','#C8E8D0','#E8D0C8'];
+
+// ── FILE IMPORT ───────────────────────────────────────────────────
+document.getElementById('file-input').addEventListener('change', function(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  var status = document.getElementById('import-status');
+  status.style.color = '#f0a500';
+  status.textContent = '⏳ Procesando...';
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      var newData = parseCSV(ev.target.result);
+      if (!newData.length) { status.style.color='#e05a00'; status.textContent='❌ Sin datos válidos'; return; }
+      allData = newData;
+      filtered = allData.slice();
+      Object.keys(charts).forEach(function(id) { if(charts[id]){ charts[id].destroy(); delete charts[id]; } });
+      ['f-mes','f-area','f-modalidad','f-instructor','f-tipo','f-puesto'].forEach(function(id) {
+        var s = document.getElementById(id);
+        while(s.options.length > 1) s.remove(1);
+        s.value = '';
+      });
+      populateFilters();
+      renderAll();
+      var now = new Date().toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
+      status.style.color = '#27ae60';
+      status.textContent = '✅ ' + newData.length + ' registros · ' + now;
+    } catch(err) {
+      status.style.color = '#e05a00';
+      status.textContent = '❌ Error al leer el archivo';
+      console.error(err);
+    }
+  };
+  reader.readAsText(file, 'UTF-8');
+  e.target.value = '';
+});
+
+function parseCSV(text) {
+  var MESES = {'febrero':'Febrero','marzo':'Marzo','abril':'Abril','mayo':'Mayo','junio':'Junio','julio':'Julio','agosto':'Agosto','septiembre':'Septiembre','octubre':'Octubre','noviembre':'Noviembre','diciembre':'Diciembre'};
+  var lines = text.split('\n').filter(function(l) { return l.trim(); });
+  if (lines.length < 2) return [];
+  function parseRow(line) {
+    var res = [], cur = '', inQ = false;
+    for (var i = 0; i < line.length; i++) {
+      var ch = line[i];
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { res.push(cur.trim()); cur = ''; }
+      else { cur += ch; }
+    }
+    res.push(cur.trim());
+    return res;
+  }
+  var headers = parseRow(lines[0]);
+  return lines.slice(1).map(function(line) {
+    var vals = parseRow(line);
+    var obj = {};
+    headers.forEach(function(h, i) { obj[h] = (vals[i]||'').replace(/^"|"$/g,'').trim(); });
+    if (obj['Horas']) obj['Horas'] = parseFloat(obj['Horas']) || 0;
+    if (obj['Tipo']) obj['Tipo'] = obj['Tipo'].replace('Capacitacion Continua','Capacitación Continua').replace('Capacitación Contiua','Capacitación Continua');
+    if (obj['Área']) obj['Área'] = obj['Área'].trim();
+    if (obj['Mes']) obj['Mes'] = MESES[obj['Mes'].trim().toLowerCase()] || obj['Mes'].trim();
+    return obj;
+  }).filter(function(r) { return r['Legajo'] && r['Legajo'] !== ''; });
+}
+
+// ── FILTERS ───────────────────────────────────────────────────────
+function populateFilters() {
+  var fields = { 'f-mes':'Mes', 'f-area':'Área', 'f-modalidad':'Modalidad', 'f-instructor':'Instructor', 'f-tipo':'Tipo', 'f-puesto':'Puesto' };
+  Object.keys(fields).forEach(function(id) {
+    var field = fields[id];
+    var sel = document.getElementById(id);
+    var vals = field === 'Mes'
+      ? MES_ORDER.filter(function(m) { return allData.some(function(d) { return d['Mes']===m; }); })
+      : Object.keys(allData.reduce(function(acc, d) { if(d[field]) acc[d[field]]=1; return acc; }, {})).sort();
+    vals.forEach(function(v) {
+      var o = document.createElement('option');
+      o.value = v; o.textContent = v;
+      sel.appendChild(o);
+    });
+  });
+}
+
+function applyFilters() {
+  var mes    = document.getElementById('f-mes').value;
+  var area   = document.getElementById('f-area').value;
+  var mod    = document.getElementById('f-modalidad').value;
+  var inst   = document.getElementById('f-instructor').value;
+  var tipo   = document.getElementById('f-tipo').value;
+  var puesto = document.getElementById('f-puesto').value;
+  filtered = allData.filter(function(d) {
+    return (!mes    || d['Mes']===mes)
+        && (!area   || d['Área']===area)
+        && (!mod    || d['Modalidad']===mod)
+        && (!inst   || d['Instructor']===inst)
+        && (!tipo   || d['Tipo']===tipo)
+        && (!puesto || d['Puesto']===puesto);
+  });
+  renderAll();
+}
+
+function resetFilters() {
+  ['f-mes','f-area','f-modalidad','f-instructor','f-tipo','f-puesto'].forEach(function(id) {
+    document.getElementById(id).value = '';
+  });
+  applyFilters();
+}
+
+// ── RENDER ────────────────────────────────────────────────────────
+function renderAll() {
+  updateKPIs();
+  renderMensual();
+  renderArea();
+  renderModalidad();
+  renderInstructor();
+  renderTipo();
+  renderAcciones();
+  renderHorasArea();
+  renderRanking();
+  renderInsights();
+  renderTable();
+  document.getElementById('filtered-count').textContent = filtered.length + ' registros';
+}
+
+function groupBy(data, field) {
+  var map = {};
+  data.forEach(function(d) {
+    var k = d[field] || '—';
+    if (!map[k]) map[k] = { count:0, sum:0 };
+    map[k].count++;
+    map[k].sum += Number(d['Horas']) || 0;
+  });
+  return map;
+}
+
+function updateKPIs() {
+  var legajos = {};
+  filtered.forEach(function(d) { legajos[d['Legajo']] = 1; });
+  var numEmp = Object.keys(legajos).length;
+  var horas = filtered.reduce(function(s,d) { return s + (Number(d['Horas'])||0); }, 0);
+  var acciones = {};
+  filtered.forEach(function(d) { acciones[d['Acción']] = 1; });
+  var prom = numEmp ? (horas/numEmp).toFixed(1) : 0;
+
+  document.getElementById('k-total').textContent = filtered.length;
+  document.getElementById('k-emp').textContent = numEmp;
+  document.getElementById('k-horas').textContent = horas.toFixed(0) + 'h';
+  document.getElementById('k-acciones').textContent = Object.keys(acciones).length;
+  document.getElementById('k-prom').textContent = prom + 'h';
+  document.getElementById('kpi-header').textContent = filtered.length + ' de ' + allData.length + ' registros';
+
+  // Update period
+  var meses = Object.keys(groupBy(filtered,'Mes')).sort(function(a,b) { return MES_ORDER.indexOf(a)-MES_ORDER.indexOf(b); });
+  if (meses.length >= 2) {
+    document.getElementById('period-header').textContent = meses[0] + ' — ' + meses[meses.length-1] + ' 2026';
+  } else if (meses.length === 1) {
+    document.getElementById('period-header').textContent = meses[0] + ' 2026';
+  }
+}
+
+function makeChart(id, config) {
+  if (charts[id]) { charts[id].destroy(); }
+  charts[id] = new Chart(document.getElementById(id).getContext('2d'), config);
+}
+
+function renderMensual() {
+  var by = groupBy(filtered,'Mes');
+  var labels = MES_ORDER.filter(function(m) { return by[m]; });
+  makeChart('ch-mensual', {
+    type: 'line',
+    data: { labels: labels, datasets: [
+      { label:'Horas', data:labels.map(function(m){return by[m].sum;}), borderColor:'#7BAFD8', backgroundColor:'rgba(123,175,216,0.15)', tension:0.4, fill:true, pointBackgroundColor:'#4A90C4', pointRadius:5, yAxisID:'y' },
+      { label:'Participaciones', data:labels.map(function(m){return by[m].count;}), borderColor:'#7DC4A0', backgroundColor:'rgba(125,196,160,0.1)', tension:0.4, fill:false, pointBackgroundColor:'#27ae60', pointRadius:5, borderDash:[5,3], yAxisID:'y1' }
+    ]},
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ position:'top', labels:{ font:{size:11}, boxWidth:14 } } },
+      scales:{ y:{ position:'left', grid:{color:'#f0f4f8'}, ticks:{font:{size:10}} }, y1:{ position:'right', grid:{drawOnChartArea:false}, ticks:{font:{size:10}} }, x:{ grid:{color:'#f0f4f8'}, ticks:{font:{size:10}} } }
+    }
+  });
+}
+
+function renderArea() {
+  var by = groupBy(filtered,'Área');
+  var sorted = Object.keys(by).map(function(k){return{k:k,v:by[k]};} ).sort(function(a,b){return b.v.count-a.v.count;});
+  makeChart('ch-area', {
+    type:'bar',
+    data:{ labels:sorted.map(function(x){return x.k;}), datasets:[{ label:'Participaciones', data:sorted.map(function(x){return x.v.count;}), backgroundColor:PASTEL, borderRadius:4 }] },
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{grid:{color:'#f0f4f8'},ticks:{font:{size:10}}}, y:{ticks:{font:{size:10}}} } }
+  });
+}
+
+function makeDoughnut(id, labels, vals, colors, legId) {
+  makeChart(id, {
+    type:'doughnut',
+    data:{ labels:labels, datasets:[{ data:vals, backgroundColor:colors, borderWidth:2, borderColor:'#fff' }] },
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'65%', plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:function(ctx){ var t=vals.reduce(function(a,b){return a+b;},0); return ctx.label+': '+ctx.parsed+' ('+((ctx.parsed/t)*100).toFixed(1)+'%)'; } } } } }
+  });
+  var leg = document.getElementById(legId);
+  leg.innerHTML = labels.map(function(l,i){ return '<div class="legend-item"><div class="legend-dot" style="background:'+colors[i]+'"></div>'+l+': <b>'+vals[i]+'</b></div>'; }).join('');
+}
+
+function renderModalidad() {
+  var by = groupBy(filtered,'Modalidad');
+  var e = Object.keys(by).map(function(k){return{k:k,v:by[k]};} ).sort(function(a,b){return b.v.count-a.v.count;});
+  makeDoughnut('ch-modalidad', e.map(function(x){return x.k;}), e.map(function(x){return x.v.count;}), ['#B8D4E8','#D4B8E0'], 'leg-modalidad');
+}
+
+function renderInstructor() {
+  var by = groupBy(filtered,'Instructor');
+  var e = Object.keys(by).map(function(k){return{k:k,v:by[k]};} ).sort(function(a,b){return b.v.count-a.v.count;});
+  makeDoughnut('ch-instructor', e.map(function(x){return x.k;}), e.map(function(x){return x.v.count;}), ['#FFD6A5','#B8E0C8'], 'leg-instructor');
+}
+
+function renderTipo() {
+  var by = groupBy(filtered,'Tipo');
+  var e = Object.keys(by).map(function(k){return{k:k,v:by[k]};} ).sort(function(a,b){return b.v.count-a.v.count;});
+  makeDoughnut('ch-tipo', e.map(function(x){return x.k;}), e.map(function(x){return x.v.count;}), ['#B8D4E8','#F4C2C2','#FFD6A5'], 'leg-tipo');
+}
+
+function renderAcciones() {
+  var by = groupBy(filtered,'Acción');
+  var sorted = Object.keys(by).map(function(k){return{k:k,v:by[k]};} ).sort(function(a,b){return b.v.count-a.v.count;}).slice(0,10);
+  makeChart('ch-acciones', {
+    type:'bar',
+    data:{ labels:sorted.map(function(x){return x.k.length>30?x.k.slice(0,28)+'…':x.k;}), datasets:[{ label:'Participantes', data:sorted.map(function(x){return x.v.count;}), backgroundColor:['#FFF0A0','#FFE880','#FFD6A5','#FFBBA8','#F4C2C2','#D4B8E0','#B8D4E8','#B8E0C8','#A8D8D8','#C8D0E8'], borderRadius:4 }] },
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{grid:{color:'#f0f4f8'},ticks:{font:{size:10}}}, y:{ticks:{font:{size:10}}} } }
+  });
+}
+
+function renderHorasArea() {
+  var by = groupBy(filtered,'Área');
+  var sorted = Object.keys(by).map(function(k){return{k:k,v:by[k]};} ).sort(function(a,b){return b.v.sum-a.v.sum;});
+  makeChart('ch-horas-area', {
+    type:'bar',
+    data:{ labels:sorted.map(function(x){return x.k;}), datasets:[{ label:'Horas', data:sorted.map(function(x){return x.v.sum;}), backgroundColor:PASTEL, borderRadius:4 }] },
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{grid:{color:'#f0f4f8'},ticks:{font:{size:10}}}, y:{ticks:{font:{size:10}}} } }
+  });
+}
+
+function renderRanking() {
+  var byLeg = {};
+  filtered.forEach(function(d) {
+    var k = d['Legajo'];
+    if (!byLeg[k]) byLeg[k] = { nombre:d['Apellido y Nombre'], horas:0 };
+    byLeg[k].horas += Number(d['Horas']) || 0;
+  });
+  var sorted = Object.values(byLeg).sort(function(a,b){return b.horas-a.horas;}).slice(0,10);
+  makeChart('ch-ranking', {
+    type:'bar',
+    data:{
+      labels: sorted.map(function(d) { return d.nombre.indexOf(',')>=0 ? d.nombre.split(',').reverse().join(' ').trim() : d.nombre; }),
+      datasets:[{ label:'Horas', data:sorted.map(function(d){return d.horas;}), backgroundColor:PASTEL, borderRadius:5 }]
+    },
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{grid:{color:'#f0f4f8'},ticks:{font:{size:10}},beginAtZero:true}, y:{ticks:{font:{size:11}}} } }
+  });
+}
+
+function renderInsights() {
+  var horas = filtered.reduce(function(s,d){return s+(Number(d['Horas'])||0);},0);
+  var pres = filtered.filter(function(d){return d['Modalidad']==='Presencial';}).length;
+  var pctPres = filtered.length ? ((pres/filtered.length)*100).toFixed(0) : 0;
+  var intInst = filtered.filter(function(d){return d['Instructor']==='Interno';}).length;
+  var pctInt = filtered.length ? ((intInst/filtered.length)*100).toFixed(0) : 0;
+  var byMes = groupBy(filtered,'Mes');
+  var topMes = MES_ORDER.filter(function(m){return byMes[m];}).sort(function(a,b){return (byMes[b]?byMes[b].sum:0)-(byMes[a]?byMes[a].sum:0);})[0]||'—';
+  var byArea = groupBy(filtered,'Área');
+  var topArea = Object.keys(byArea).sort(function(a,b){return byArea[b].count-byArea[a].count;})[0];
+  var byAcc = groupBy(filtered,'Acción');
+  var topAcc = Object.keys(byAcc).sort(function(a,b){return byAcc[b].count-byAcc[a].count;})[0];
+  var ins = [
+    { cls:'ins-blue',   title:'📈 Mes Pico',        text: topMes!=='—' ? topMes+' concentra '+byMes[topMes].sum+'h y '+byMes[topMes].count+' participaciones.' : 'Sin datos.' },
+    { cls:'ins-green',  title:'🏢 Área Líder',       text: topArea ? topArea+' lidera con '+byArea[topArea].count+' participaciones ('+((byArea[topArea].count/filtered.length)*100).toFixed(0)+'% del total).' : 'Sin datos.' },
+    { cls:'ins-orange', title:'💻 Modalidad: '+pctPres+'% Presencial', text: pctPres+'% presencial. Instructores internos: '+pctInt+'% / externos: '+(100-pctInt)+'%.' },
+    { cls:'ins-purple', title:'🎯 Acción Principal', text: topAcc ? '"'+topAcc+'" es la más frecuente con '+byAcc[topAcc].count+' participantes.' : 'Sin datos.' }
+  ];
+  document.getElementById('insights-container').innerHTML = ins.map(function(i){
+    return '<div class="insight-card '+i.cls+'"><h4>'+i.title+'</h4><p>'+i.text+'</p></div>';
+  }).join('');
+}
+
+function renderTable() {
+  var q = (document.getElementById('table-search').value||'').toLowerCase().trim();
+  var searched = q ? filtered.filter(function(d){
+    return String(d['Apellido y Nombre']).toLowerCase().indexOf(q)>=0 || String(d['Legajo']).toLowerCase().indexOf(q)>=0;
+  }) : filtered;
+  var show = searched.slice(0,100);
+  document.getElementById('table-body').innerHTML = show.map(function(d){
+    var mod = (d['Modalidad']||'').toLowerCase();
+    var inst = (d['Instructor']||'').toLowerCase();
+    return '<tr><td>'+d['Legajo']+'</td><td>'+d['Apellido y Nombre']+'</td><td>'+d['Área']+'</td>'
+      +'<td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+d['Puesto']+'</td>'
+      +'<td>'+d['Acción']+'</td><td>'+d['Tipo']+'</td><td>'+d['Mes']+'</td><td>'+d['Horas']+'</td>'
+      +'<td><span class="badge '+mod+'">'+d['Modalidad']+'</span></td>'
+      +'<td><span class="badge '+inst+'">'+d['Instructor']+'</span></td></tr>';
+  }).join('');
+  document.getElementById('table-count').textContent = q
+    ? '('+show.length+' de '+searched.length+' resultados)'
+    : '(mostrando '+show.length+' de '+filtered.length+')';
+}
+
+function exportToExcel() {
+  var q = (document.getElementById('table-search').value||'').toLowerCase().trim();
+  var toExp = q ? filtered.filter(function(d){
+    return String(d['Apellido y Nombre']).toLowerCase().indexOf(q)>=0 || String(d['Legajo']).toLowerCase().indexOf(q)>=0;
+  }) : filtered;
+  var cols = ['Legajo','Apellido y Nombre','Area','Puesto','Accion','Tipo','Mes','Horas','Modalidad','Instructor','Estado'];
+  var colsOrig = ['Legajo','Apellido y Nombre','Área','Puesto','Acción','Tipo','Mes','Horas','Modalidad','Instructor','Estado'];
+  var wsData = [cols].concat(toExp.map(function(d){ return colsOrig.map(function(c){ return d[c]||''; }); }));
+  var ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!cols'] = cols.map(function(c){ return {wch:Math.max(c.length,14)}; });
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Capacitacion');
+  var fecha = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, 'Capacitacion_ShopGallery_'+fecha+'.xlsx');
+}
+
+// ── INIT ──────────────────────────────────────────────────────────
+populateFilters();
+renderAll();
+</script>
+</body>
+</html>
